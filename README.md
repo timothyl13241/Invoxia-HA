@@ -12,3 +12,4 @@ This integration has been made possible only with the contribution of the awesom
 - [@enzlo-picori]
 - [@MagnusErler]
 - [@bercht-a]
+- [@julesxxl]
