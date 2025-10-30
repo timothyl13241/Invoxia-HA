@@ -8,6 +8,7 @@ from async_timeout import timeout
 from gps_tracker import AsyncClient, Tracker
 from gps_tracker.client.exceptions import GpsTrackerException
 
+from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed

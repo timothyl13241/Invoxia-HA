@@ -6,6 +6,7 @@ import asyncio
 from gps_tracker import AsyncClient, Tracker
 from gps_tracker.client.datatypes import Tracker01
 
+from homeassistant import config_entries
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITIES
@@ -23,11 +24,11 @@ PARALLEL_UPDATES = 1
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the device_tracker platform."""
-    client: AsyncClient = hass.data[DOMAIN][entry.entry_id][CLIENT]
+    client: AsyncClient = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
     trackers: list[Tracker] = await client.get_trackers()
 
     coordinators = [
@@ -43,7 +44,7 @@ async def async_setup_entry(
         for tracker, coordinator in zip(trackers, coordinators)
     ]
 
-    hass.data[DOMAIN][entry.entry_id][CONF_ENTITIES].extend(entities)
+    hass.data[DOMAIN][config_entry.entry_id][CONF_ENTITIES].extend(entities)
     async_add_entities(entities, update_before_add=True)
 
 
@@ -72,7 +73,7 @@ class GpsTrackerEntity(CoordinatorEntity[GpsTrackerCoordinator], TrackerEntity):
         if isinstance(tracker, Tracker01):
             self._attr_icon = MDI_ICONS[tracker.tracker_config.icon]
             self._attr_device_info = self._form_device_info(
-                tracker
+                self._tracker
             )  # type:ignore[assignment]
             self._attr_name = self._tracker.name
             self._attr_unique_id = str(self._tracker.id)
