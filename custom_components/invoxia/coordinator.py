@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Optional
 
 from async_timeout import timeout
 from gps_tracker import AsyncClient, Tracker
@@ -9,7 +10,7 @@ from gps_tracker.client.exceptions import GpsTrackerException
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import UNDEFINED
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DATA_UPDATE_INTERVAL, DOMAIN, LOGGER
@@ -20,20 +21,19 @@ class GpsTrackerCoordinator(DataUpdateCoordinator):
     """Coordinator to update GpsTracker entities."""
 
     def __init__(
-        self, hass: HomeAssistant, config_entry: config_entries.ConfigEntry, client: AsyncClient, tracker: Tracker
+        self,
+        hass: HomeAssistant,
+        config_entry: Optional[ConfigEntry],
+        client: AsyncClient,
+        tracker: Tracker,
     ) -> None:
         """Coordinator for single tracker."""
+        # store references
         self._client = client
         self._tracker = tracker
-        if config_entry is UNDEFINED:
-            self.config_entry = config_entries.current_entry.get()
-            # This should be deprecated once all core integrations are updated
-            # to pass in the config entry explicitly.
-        else:
-            self.config_entry = config_entry
+        # keep a reference to the ConfigEntry when provided (may be None in some tests/legacy callers)
+        self.config_entry = config_entry
 
-        if self.config_entry:
-            self.config_entry.async_on_unload(self.async_shutdown)
         super().__init__(
             hass,
             LOGGER,

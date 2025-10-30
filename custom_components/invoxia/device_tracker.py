@@ -32,18 +32,15 @@ async def async_setup_entry(
     trackers: list[Tracker] = await client.get_trackers()
 
     coordinators = [
-        GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
+        GpsTrackerCoordinator(hass, entry, client, tracker) for tracker in trackers
     ]
 
     await asyncio.gather(
-        *[
-            coordinator.async_refresh()
-            for coordinator in coordinators
-        ]
+        *(c.async_config_entry_first_refresh() for c in coordinators),
     )
 
     entities = [
-        GpsTrackerEntity(coordinator, config_entry, client, tracker)
+        GpsTrackerEntity(coordinator, entry, client, tracker)
         for tracker, coordinator in zip(trackers, coordinators)
     ]
 
@@ -58,7 +55,11 @@ class GpsTrackerEntity(CoordinatorEntity[GpsTrackerCoordinator], TrackerEntity):
     _attr_should_poll = False
 
     def __init__(
-        self, coordinator: GpsTrackerCoordinator, config_entry: config_entries.ConfigEntry, client: AsyncClient, tracker: Tracker
+        self,
+        coordinator: GpsTrackerCoordinator,
+        config_entry: ConfigEntry,
+        client: AsyncClient,
+        tracker: Tracker,
     ) -> None:
         """Store tracker main properties."""
         super().__init__(coordinator)
