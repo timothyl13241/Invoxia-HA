@@ -51,7 +51,7 @@ class GpsTrackerCoordinator(DataUpdateCoordinator):
                 )
             except GpsTrackerException as err:
                 LOGGER.warning("Could not fetch data for Tracker %u", self._tracker.id)
-                raise UpdateFailed from err
+                raise UpdateFailed(err) from err
 
         return GpsTrackerData(
             latitude=data[0][0].lat,
