@@ -1,8 +1,9 @@
 """The Invoxia (unofficial) integration."""
 from __future__ import annotations
 
-import gps_tracker
+from typing import Any
 
+# Import gps_tracker lazily inside async_setup_entry to avoid import-time crashes
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITIES, CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
@@ -17,6 +18,13 @@ PLATFORMS: list[Platform] = [Platform.DEVICE_TRACKER]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up GPS Tracker from a config entry."""
     hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
+
+    # Import the gps_tracker library lazily and handle import-time failures.
+    try:
+        import gps_tracker  # type: ignore
+    except Exception as err:
+        # Import error or metadata KeyError in gps_tracker — fail setup cleanly so HA can retry
+        raise ConfigEntryNotReady(f"Failed to import gps_tracker library: {err}") from err
 
     config = gps_tracker.Config(  # type: ignore[call-arg]
         password=entry.data[CONF_PASSWORD],
@@ -43,7 +51,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        await hass.data[DOMAIN][entry.entry_id][CLIENT].close()
-        hass.data[DOMAIN].pop(entry.entry_id)
+        client = hass.data[DOMAIN].get(entry.entry_id, {}).get(CLIENT)
+        if client is not None and hasattr(client, "close"):
+            await client.close()
+        hass.data[DOMAIN].pop(entry.entry_id, None)
 
     return unload_ok

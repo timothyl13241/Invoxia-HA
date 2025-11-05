@@ -23,27 +23,30 @@ PARALLEL_UPDATES = 1
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the device_tracker platform."""
-    client: AsyncClient = hass.data[DOMAIN][entry.entry_id][CLIENT]
+    client: AsyncClient = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
     trackers: list[Tracker] = await client.get_trackers()
 
     coordinators = [
-        GpsTrackerCoordinator(hass, entry, client, tracker) for tracker in trackers
+        GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
     ]
 
     await asyncio.gather(
-        *(c.async_config_entry_first_refresh() for c in coordinators),
+        *[
+            coordinator.async_refresh()
+            for coordinator in coordinators
+        ]
     )
 
     entities = [
-        GpsTrackerEntity(coordinator, entry, client, tracker)
+        GpsTrackerEntity(coordinator, config_entry, client, tracker)
         for tracker, coordinator in zip(trackers, coordinators)
     ]
 
-    hass.data[DOMAIN][entry.entry_id][CONF_ENTITIES].extend(entities)
+    hass.data[DOMAIN][config_entry.entry_id][CONF_ENTITIES].extend(entities)
     async_add_entities(entities, update_before_add=True)
 
 
