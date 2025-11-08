@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 
 from gps_tracker import AsyncClient, Tracker
-from gps_tracker.client.datatypes import Tracker01
+from gps_tracker.client.datatypes import Tracker01, TrackerIcon
 
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
 from homeassistant.config_entries import ConfigEntry
@@ -14,11 +15,51 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTRIBUTION, CLIENT, DOMAIN, LOGGER, MDI_ICONS
+from .const import ATTRIBUTION, CLIENT, DOMAIN, LOGGER
 from .coordinator import GpsTrackerCoordinator
 from .helpers import GpsTrackerData
 
 PARALLEL_UPDATES = 1
+
+# Icon mapping for tracker types - defined here to avoid importing gps_tracker at module level in const.py
+MDI_ICONS: Mapping[TrackerIcon, str] = {
+    TrackerIcon.OTHER: "mdi:cube",
+    TrackerIcon.HANDBAG: "mdi:purse",
+    TrackerIcon.BRIEFCASE: "mdi:briefcase",
+    TrackerIcon.SUITCASE: "mdi:bag-suitcase",
+    TrackerIcon.BACKPACK: "mdi:bag-personal",
+    TrackerIcon.BIKE: "mdi:bicycle-basket",
+    TrackerIcon.BOAT: "mdi:sail-boat",
+    TrackerIcon.CAR: "mdi:car-hatchback",
+    TrackerIcon.CARAVAN: "mdi:caravan",
+    TrackerIcon.CART: "mdi:dolly",
+    TrackerIcon.KAYAK: "mdi:kayaking",
+    TrackerIcon.LAPTOP: "mdi:laptop",
+    TrackerIcon.MOTO: "mdi:motorbike",
+    TrackerIcon.HELICOPTER: "mdi:helicopter",
+    TrackerIcon.PLANE: "mdi:airplane",
+    TrackerIcon.SCOOTER: "mdi:moped",
+    TrackerIcon.TENT: "mdi:tent",
+    TrackerIcon.TRUCK: "mdi:truck",
+    TrackerIcon.TRACTOR: "mdi:tractor",
+    TrackerIcon.DOG: "mdi:dog",
+    TrackerIcon.CAT: "mdi:cat",
+    TrackerIcon.PERSON: "mdi:face-man",
+    TrackerIcon.GIRL: "mdi:face-woman",
+    TrackerIcon.BACKHOE_LOADER: "mdi:excavator",
+    TrackerIcon.ANIMAL: "mdi:paw",
+    TrackerIcon.WOMAN: "mdi:human-female",
+    TrackerIcon.MAN: "mdi:human-male",
+    TrackerIcon.EBIKE: "mdi:scooter",
+    TrackerIcon.BEEHIVE: "mdi:beehive-outline",
+    TrackerIcon.CARPARK: "mdi:garage",
+    TrackerIcon.ANTENNA: "mdi:antenna",
+    TrackerIcon.HEALTH: "mdi:hospital-box",
+    TrackerIcon.KEYS: "mdi:key-chain-variant",
+    TrackerIcon.WASHER: "mdi:washing-machine",
+    TrackerIcon.TV: "mdi:television",
+    TrackerIcon.PHONE: "mdi:cellphone",
+}
 
 
 async def async_setup_entry(
@@ -36,7 +77,7 @@ async def async_setup_entry(
 
     await asyncio.gather(
         *[
-            coordinator.async_refresh()
+            coordinator.async_config_entry_first_refresh()
             for coordinator in coordinators
         ]
     )

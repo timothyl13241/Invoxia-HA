@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Any
 
 import aiohttp
-import gps_tracker
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow
@@ -29,6 +28,9 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
 
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
+    # Import gps_tracker here to avoid import-time failures when package metadata is incomplete
+    import gps_tracker  # type: ignore  # pylint: disable=import-outside-toplevel
+
     cfg = gps_tracker.Config(  # type: ignore[call-arg]
         password=data[CONF_PASSWORD],
         username=data[CONF_USERNAME],
