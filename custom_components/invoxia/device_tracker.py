@@ -70,7 +70,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up the device_tracker platform."""
     client: AsyncClient = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
-    trackers: list[Tracker] = await client.get_trackers()
+    # Get trackers from hass.data (already fetched in __init__.py)
+    trackers: list[Tracker] = hass.data[DOMAIN][config_entry.entry_id].get("trackers", [])
+    
+    if not trackers:
+        LOGGER.info("No trackers found for this account")
+        return
 
     coordinators = [
         GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers

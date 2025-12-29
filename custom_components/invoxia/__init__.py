@@ -50,18 +50,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     if not trackers:
         LOGGER.warning("No trackers found for account %s", entry.data[CONF_USERNAME])
+        # Still proceed with setup even if no trackers are found
+        # User might add trackers later
     else:
         # Test that we can fetch data for at least one tracker before forwarding
         # This validates the API is working properly
-        try:
-            test_tracker = trackers[0]
-            await client.get_locations(test_tracker, max_count=1)
-            LOGGER.debug("Successfully validated API access with tracker %s", test_tracker.id)
-        except gps_tracker.client.exceptions.GpsTrackerException as err:
-            raise ConfigEntryNotReady(f"Failed to fetch tracker data: {err}") from err
+        # Try each tracker until we find one that works
+        any_tracker_working = False
+        for test_tracker in trackers:
+            try:
+                await client.get_locations(test_tracker, max_count=1)
+                LOGGER.debug("Successfully validated API access with tracker %s", test_tracker.id)
+                any_tracker_working = True
+                break
+            except gps_tracker.client.exceptions.GpsTrackerException as err:
+                LOGGER.warning("Failed to fetch data for tracker %s: %s", test_tracker.id, err)
+                continue
+        
+        if not any_tracker_working:
+            # None of the trackers are working, but don't fail setup
+            # The coordinators will retry automatically
+            LOGGER.warning("Could not fetch data for any tracker, entities will be unavailable until coordinators succeed")
 
     hass.data[DOMAIN][entry.entry_id][CLIENT] = client
     hass.data[DOMAIN][entry.entry_id][CONF_ENTITIES] = []
+    # Store trackers in hass.data so device_tracker.py doesn't need to call get_trackers() again
+    hass.data[DOMAIN][entry.entry_id]["trackers"] = trackers
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
