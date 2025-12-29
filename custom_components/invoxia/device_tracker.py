@@ -98,20 +98,20 @@ async def async_setup_entry(
         GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
     ]
 
-    # Perform first refresh for each coordinator
+    # Perform first refresh for each coordinator.
     # If a coordinator fails, we still add the entity but it will be unavailable
-    # until the next successful update
-    # IMPORTANT: We must catch ConfigEntryNotReady here to prevent it from propagating
-    # to the platform, which would violate Home Assistant's requirement
+    # until the next successful update.
+    # Note: ConfigEntryNotReady is expected to be raised (and handled) in __init__.py
+    # before forwarding entry setups; we catch it here defensively so an unexpected
+    # occurrence does not break platform setup.
     for coordinator in coordinators:
         try:
             await coordinator.async_config_entry_first_refresh()
         except (GpsTrackerException, UpdateFailed, ConfigEntryNotReady) as err:
             # Log the error but don't fail the setup - the entity will be unavailable
-            # until the coordinator successfully updates
-            # We explicitly catch ConfigEntryNotReady here because the coordinator's
-            # first refresh can raise it, but we must not let it propagate from this
-            # platform setup function
+            # until the coordinator successfully updates.
+            # ConfigEntryNotReady should not normally occur here because validation is
+            # already done in __init__.py, but we still catch it defensively.
             LOGGER.warning(
                 "Failed to fetch initial data for tracker %s: %s",
                 coordinator._tracker.id,
