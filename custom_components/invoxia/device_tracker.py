@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 from gps_tracker import AsyncClient, Tracker
 from gps_tracker.client.datatypes import Tracker01, TrackerIcon
+from gps_tracker.client.exceptions import GpsTrackerException
 
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
 from homeassistant.config_entries import ConfigEntry
@@ -13,7 +14,7 @@ from homeassistant.const import CONF_ENTITIES
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 
 from .const import ATTRIBUTION, CLIENT, DOMAIN, LOGGER
 from .coordinator import GpsTrackerCoordinator
@@ -81,7 +82,7 @@ async def async_setup_entry(
     for coordinator in coordinators:
         try:
             await coordinator.async_config_entry_first_refresh()
-        except Exception as err:
+        except (GpsTrackerException, UpdateFailed) as err:
             # Log the error but don't fail the setup - the entity will be unavailable
             # until the coordinator successfully updates
             LOGGER.warning(
