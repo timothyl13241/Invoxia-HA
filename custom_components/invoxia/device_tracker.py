@@ -114,7 +114,7 @@ async def async_setup_entry(
             # already done in __init__.py, but we still catch it defensively.
             LOGGER.warning(
                 "Failed to fetch initial data for tracker %s: %s",
-                coordinator._tracker.id,
+                coordinator.tracker_id,
                 err,
             )
 
