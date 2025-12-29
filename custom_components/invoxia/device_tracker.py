@@ -16,7 +16,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 
-from .const import ATTRIBUTION, CLIENT, DOMAIN, LOGGER
+from .const import ATTRIBUTION, CLIENT, DOMAIN, LOGGER, TRACKERS
 from .coordinator import GpsTrackerCoordinator
 from .helpers import GpsTrackerData
 
@@ -71,7 +71,7 @@ async def async_setup_entry(
     """Set up the device_tracker platform."""
     client: AsyncClient = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
     # Get trackers from hass.data (already fetched in __init__.py)
-    trackers: list[Tracker] = hass.data[DOMAIN][config_entry.entry_id].get("trackers", [])
+    trackers: list[Tracker] = hass.data[DOMAIN][config_entry.entry_id].get(TRACKERS) or []
     
     if not trackers:
         LOGGER.info("No trackers found for this account")

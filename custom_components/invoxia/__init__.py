@@ -10,7 +10,7 @@ from homeassistant.const import CONF_ENTITIES, CONF_PASSWORD, CONF_USERNAME, Pla
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
-from .const import CLIENT, DOMAIN, LOGGER
+from .const import CLIENT, DOMAIN, LOGGER, TRACKERS
 from .helpers import get_invoxia_client
 
 PLATFORMS: list[Platform] = [Platform.DEVICE_TRACKER]
@@ -75,7 +75,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id][CLIENT] = client
     hass.data[DOMAIN][entry.entry_id][CONF_ENTITIES] = []
     # Store trackers in hass.data so device_tracker.py doesn't need to call get_trackers() again
-    hass.data[DOMAIN][entry.entry_id]["trackers"] = trackers
+    hass.data[DOMAIN][entry.entry_id][TRACKERS] = trackers
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

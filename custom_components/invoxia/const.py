@@ -13,3 +13,5 @@ DATA_UPDATE_INTERVAL = timedelta(seconds=420)
 DOMAIN = "invoxia"
 
 LOGGER = logging.getLogger(__package__)
+
+TRACKERS = "trackers"
