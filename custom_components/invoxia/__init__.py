@@ -83,6 +83,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Store all trackers in hass.data (including those that failed validation)
     # This is intentional - coordinators will automatically retry for failed trackers
+    # Also prevents device_tracker.py from needing to call get_trackers() again
     hass.data[DOMAIN][entry.entry_id][CLIENT] = client
     hass.data[DOMAIN][entry.entry_id][CONF_ENTITIES] = []
     hass.data[DOMAIN][entry.entry_id][TRACKERS] = trackers
