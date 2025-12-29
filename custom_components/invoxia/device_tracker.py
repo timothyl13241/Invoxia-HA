@@ -6,16 +6,14 @@ from collections.abc import Mapping
 
 from gps_tracker import AsyncClient, Tracker
 from gps_tracker.client.datatypes import Tracker01, TrackerIcon
-from gps_tracker.client.exceptions import GpsTrackerException
 
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITIES
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTRIBUTION, CLIENT, DOMAIN, LOGGER
 from .coordinator import GpsTrackerCoordinator
@@ -71,25 +69,18 @@ async def async_setup_entry(
 ) -> None:
     """Set up the device_tracker platform."""
     client: AsyncClient = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
-    
-    try:
-        trackers: list[Tracker] = await client.get_trackers()
-    except GpsTrackerException as err:
-        raise ConfigEntryNotReady(f"Failed to get trackers: {err}") from err
+    trackers: list[Tracker] = await client.get_trackers()
 
     coordinators = [
         GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
     ]
 
-    try:
-        await asyncio.gather(
-            *[
-                coordinator.async_config_entry_first_refresh()
-                for coordinator in coordinators
-            ]
-        )
-    except (GpsTrackerException, UpdateFailed) as err:
-        raise ConfigEntryNotReady(f"Failed to fetch initial data: {err}") from err
+    await asyncio.gather(
+        *[
+            coordinator.async_config_entry_first_refresh()
+            for coordinator in coordinators
+        ]
+    )
 
     entities = [
         GpsTrackerEntity(coordinator, config_entry, client, tracker)
