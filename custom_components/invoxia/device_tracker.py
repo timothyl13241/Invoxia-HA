@@ -68,19 +68,29 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the device_tracker platform."""
+    from gps_tracker.client.exceptions import GpsTrackerException
+    from homeassistant.exceptions import ConfigEntryNotReady
+    
     client: AsyncClient = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
-    trackers: list[Tracker] = await client.get_trackers()
+    
+    try:
+        trackers: list[Tracker] = await client.get_trackers()
+    except GpsTrackerException as err:
+        raise ConfigEntryNotReady(f"Failed to get trackers: {err}") from err
 
     coordinators = [
         GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
     ]
 
-    await asyncio.gather(
-        *[
-            coordinator.async_config_entry_first_refresh()
-            for coordinator in coordinators
-        ]
-    )
+    try:
+        await asyncio.gather(
+            *[
+                coordinator.async_config_entry_first_refresh()
+                for coordinator in coordinators
+            ]
+        )
+    except Exception as err:
+        raise ConfigEntryNotReady(f"Failed to fetch initial data: {err}") from err
 
     entities = [
         GpsTrackerEntity(coordinator, config_entry, client, tracker)
