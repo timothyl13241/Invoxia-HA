@@ -2,7 +2,7 @@
   "domain": "invoxia",
   "name": "Invoxia (unofficial)",
   "config_flow": true,
-  "documentation": "https://github.com/timothyle97/invoxia-HA/blob/main/README.md",
+  "documentation": "https://github.com/timothyl13241/invoxia-HA/blob/main/README.md",
   "requirements": ["gps-tracker>=0.9.2,<0.10.0"],
   "ssdp": [],
   "zeroconf": [],
