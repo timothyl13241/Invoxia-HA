@@ -75,12 +75,20 @@ async def async_setup_entry(
         GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
     ]
 
-    await asyncio.gather(
-        *[
-            coordinator.async_config_entry_first_refresh()
-            for coordinator in coordinators
-        ]
-    )
+    # Perform first refresh for each coordinator
+    # If a coordinator fails, we still add the entity but it will be unavailable
+    # until the next successful update
+    for coordinator in coordinators:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as err:
+            # Log the error but don't fail the setup - the entity will be unavailable
+            # until the coordinator successfully updates
+            LOGGER.warning(
+                "Failed to fetch initial data for tracker %s: %s",
+                coordinator._tracker.id,
+                err,
+            )
 
     entities = [
         GpsTrackerEntity(coordinator, config_entry, client, tracker)
@@ -88,7 +96,7 @@ async def async_setup_entry(
     ]
 
     hass.data[DOMAIN][config_entry.entry_id][CONF_ENTITIES].extend(entities)
-    async_add_entities(entities, update_before_add=True)
+    async_add_entities(entities, update_before_add=False)
 
 
 class GpsTrackerEntity(CoordinatorEntity[GpsTrackerCoordinator], TrackerEntity):

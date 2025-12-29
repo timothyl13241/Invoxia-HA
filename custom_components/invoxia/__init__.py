@@ -50,6 +50,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     if not trackers:
         LOGGER.warning("No trackers found for account %s", entry.data[CONF_USERNAME])
+    else:
+        # Test that we can fetch data for at least one tracker before forwarding
+        # This validates the API is working properly
+        try:
+            test_tracker = trackers[0]
+            await client.get_locations(test_tracker, max_count=1)
+            LOGGER.debug("Successfully validated API access with tracker %s", test_tracker.id)
+        except gps_tracker.client.exceptions.GpsTrackerException as err:
+            raise ConfigEntryNotReady(f"Failed to fetch tracker data: {err}") from err
 
     hass.data[DOMAIN][entry.entry_id][CLIENT] = client
     hass.data[DOMAIN][entry.entry_id][CONF_ENTITIES] = []
