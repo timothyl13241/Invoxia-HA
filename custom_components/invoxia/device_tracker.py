@@ -72,8 +72,24 @@ async def async_setup_entry(
     """Set up the device_tracker platform."""
     client: AsyncClient = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
     # Get trackers from hass.data (already fetched in __init__.py)
-    trackers: list[Tracker] = hass.data[DOMAIN][config_entry.entry_id].get(TRACKERS) or []
-    
+    entry_data = hass.data[DOMAIN].get(config_entry.entry_id)
+    if entry_data is None:
+        LOGGER.error(
+            "No data found in hass.data for config entry %s; "
+            "invoxia integration may not have initialized correctly",
+            config_entry.entry_id,
+        )
+        return
+
+    if TRACKERS not in entry_data:
+        LOGGER.error(
+            "TRACKERS key missing in hass.data for config entry %s; "
+            "there may be a problem with invoxia integration initialization in __init__.py",
+            config_entry.entry_id,
+        )
+        return
+
+    trackers: list[Tracker] = entry_data[TRACKERS]
     if not trackers:
         LOGGER.info("No trackers found for this account")
         return
