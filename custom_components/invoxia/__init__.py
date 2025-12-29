@@ -16,6 +16,12 @@ from .helpers import get_invoxia_client
 PLATFORMS: list[Platform] = [Platform.DEVICE_TRACKER]
 
 
+def _import_gps_tracker():
+    """Import gps_tracker module (blocking operation run in thread)."""
+    import gps_tracker  # type: ignore
+    return gps_tracker
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up GPS Tracker from a config entry."""
     hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
@@ -62,6 +68,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 await client.get_locations(test_tracker, max_count=1)
                 LOGGER.debug("Successfully validated API access with tracker %s", test_tracker.id)
                 any_tracker_working = True
+                # Stop after validating one working tracker - this confirms API is working
+                # All trackers (including failed ones) will be added and their coordinators
+                # will retry automatically
                 break
             except gps_tracker.client.exceptions.GpsTrackerException as err:
                 LOGGER.warning("Failed to fetch data for tracker %s: %s", test_tracker.id, err)
@@ -69,22 +78,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         
         if not any_tracker_working:
             # None of the trackers are working, but don't fail setup
-            # The coordinators will retry automatically
+            # The coordinators will retry automatically for all trackers
             LOGGER.warning("Could not fetch data for any tracker, entities will be unavailable until coordinators succeed")
 
+    # Store all trackers in hass.data (including those that failed validation)
+    # This is intentional - coordinators will automatically retry for failed trackers
     hass.data[DOMAIN][entry.entry_id][CLIENT] = client
     hass.data[DOMAIN][entry.entry_id][CONF_ENTITIES] = []
-    # Store trackers in hass.data so device_tracker.py doesn't need to call get_trackers() again
     hass.data[DOMAIN][entry.entry_id][TRACKERS] = trackers
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
-
-
-def _import_gps_tracker():
-    """Import gps_tracker module (blocking operation run in thread)."""
-    import gps_tracker  # type: ignore
-    return gps_tracker
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
