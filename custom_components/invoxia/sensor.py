@@ -17,7 +17,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 
-from .const import ATTRIBUTION, CLIENT, DOMAIN, LOGGER, TRACKERS
+from .const import ATTRIBUTION, CLIENT, COORDINATORS, DOMAIN, LOGGER, TRACKERS
 from .coordinator import GpsTrackerCoordinator
 
 PARALLEL_UPDATES = 1
@@ -53,22 +53,28 @@ async def async_setup_entry(
         LOGGER.info("No trackers found for this account")
         return
 
-    coordinators = [
-        GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
-    ]
-
-    # Perform first refresh for each coordinator.
-    # If a coordinator fails, we still add the entity but it will be unavailable
-    # until the next successful update.
-    for coordinator in coordinators:
-        try:
-            await coordinator.async_config_entry_first_refresh()
-        except (GpsTrackerException, UpdateFailed, ConfigEntryNotReady) as err:
-            LOGGER.warning(
-                "Failed to fetch initial data for tracker %s: %s",
-                coordinator.tracker_id,
-                err,
-            )
+    # Reuse coordinators created by device_tracker platform
+    coordinators = entry_data.get(COORDINATORS)
+    if coordinators is None:
+        LOGGER.error(
+            "COORDINATORS key missing in hass.data for config entry %s; "
+            "device_tracker platform should have created them first",
+            config_entry.entry_id,
+        )
+        # Fall back to creating coordinators if they don't exist
+        coordinators = [
+            GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
+        ]
+        # Perform first refresh for each coordinator
+        for coordinator in coordinators:
+            try:
+                await coordinator.async_config_entry_first_refresh()
+            except (GpsTrackerException, UpdateFailed, ConfigEntryNotReady) as err:
+                LOGGER.warning(
+                    "Failed to fetch initial data for tracker %s: %s",
+                    coordinator.tracker_id,
+                    err,
+                )
 
     entities = []
     for tracker, coordinator in zip(trackers, coordinators):
