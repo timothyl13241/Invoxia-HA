@@ -62,12 +62,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Test that we can fetch data for at least one tracker before forwarding
         # This validates the API is working properly
         # Try each tracker until we find one that works
-        any_tracker_working = False
+        found_working_tracker = False
         for test_tracker in trackers:
             try:
                 await client.get_locations(test_tracker, max_count=1)
                 LOGGER.debug("Successfully validated API access with tracker %s", test_tracker.id)
-                any_tracker_working = True
+                found_working_tracker = True
                 # Stop after validating one working tracker - this confirms API is working
                 # All trackers (including failed ones) will be added and their coordinators
                 # will retry automatically
@@ -76,10 +76,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 LOGGER.warning("Failed to fetch data for tracker %s: %s", test_tracker.id, err)
                 continue
         
-        if not any_tracker_working:
-            # None of the trackers are working, but don't fail setup
-            # The coordinators will retry automatically for all trackers
-            LOGGER.warning("Could not fetch data for any tracker, entities will be unavailable until coordinators succeed")
+        if not found_working_tracker:
+            # None of the trackers validated successfully during setup
+            # Setup continues anyway - coordinators will retry automatically for all trackers
+            LOGGER.warning("Could not validate any tracker during setup, entities will be unavailable until coordinators succeed")
 
     # Store all trackers in hass.data (including those that failed validation)
     # This is intentional - coordinators will automatically retry for failed trackers
