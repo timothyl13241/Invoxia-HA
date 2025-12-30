@@ -3,9 +3,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from gps_tracker import AsyncClient, Tracker
-from gps_tracker.client.exceptions import GpsTrackerException
-
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -21,6 +18,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFa
 
 if TYPE_CHECKING:
     from asyncio import Task
+
+    from gps_tracker import AsyncClient, Tracker
+    from gps_tracker.client.exceptions import GpsTrackerException
 
 try:
     from homeassistant.helpers.location import async_detect_location_info
@@ -40,7 +40,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the sensor platform."""
-    client: AsyncClient = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
+    # Import at runtime to avoid blocking the event loop during module import
+    from gps_tracker.client.exceptions import GpsTrackerException  # pylint: disable=import-outside-toplevel
+
+    client = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
     # Get trackers from hass.data (already fetched in __init__.py)
     entry_data = hass.data[DOMAIN].get(config_entry.entry_id)
     if entry_data is None:
@@ -59,7 +62,7 @@ async def async_setup_entry(
         )
         return
 
-    trackers: list[Tracker] = entry_data[TRACKERS]
+    trackers = entry_data[TRACKERS]
     if not trackers:
         LOGGER.info("No trackers found for this account")
         return
