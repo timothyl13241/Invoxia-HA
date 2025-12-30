@@ -71,7 +71,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 # Continue validating remaining trackers to log all failures
             except gps_tracker.client.exceptions.GpsTrackerException as err:
                 LOGGER.warning("Failed to validate tracker %s: %s", test_tracker.id, err)
-                continue
 
         if not found_working_tracker:
             # None of the trackers validated successfully during setup
