@@ -6,16 +6,18 @@ from collections.abc import Mapping
 
 from gps_tracker import AsyncClient, Tracker
 from gps_tracker.client.datatypes import Tracker01, TrackerIcon
+from gps_tracker.client.exceptions import GpsTrackerException
 
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITIES
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 
-from .const import ATTRIBUTION, CLIENT, DOMAIN, LOGGER
+from .const import ATTRIBUTION, CLIENT, DOMAIN, LOGGER, TRACKERS
 from .coordinator import GpsTrackerCoordinator
 from .helpers import GpsTrackerData
 
@@ -69,18 +71,52 @@ async def async_setup_entry(
 ) -> None:
     """Set up the device_tracker platform."""
     client: AsyncClient = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
-    trackers: list[Tracker] = await client.get_trackers()
+    # Get trackers from hass.data (already fetched in __init__.py)
+    entry_data = hass.data[DOMAIN].get(config_entry.entry_id)
+    if entry_data is None:
+        LOGGER.error(
+            "No data found in hass.data for config entry %s; "
+            "invoxia integration may not have initialized correctly",
+            config_entry.entry_id,
+        )
+        return
+
+    if TRACKERS not in entry_data:
+        LOGGER.error(
+            "TRACKERS key missing in hass.data for config entry %s; "
+            "there may be a problem with invoxia integration initialization in __init__.py",
+            config_entry.entry_id,
+        )
+        return
+
+    trackers: list[Tracker] = entry_data[TRACKERS]
+    if not trackers:
+        LOGGER.info("No trackers found for this account")
+        return
 
     coordinators = [
         GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
     ]
 
-    await asyncio.gather(
-        *[
-            coordinator.async_config_entry_first_refresh()
-            for coordinator in coordinators
-        ]
-    )
+    # Perform first refresh for each coordinator.
+    # If a coordinator fails, we still add the entity but it will be unavailable
+    # until the next successful update.
+    # Note: ConfigEntryNotReady is expected to be raised (and handled) in __init__.py
+    # before forwarding entry setups; we catch it here defensively so an unexpected
+    # occurrence does not break platform setup.
+    for coordinator in coordinators:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except (GpsTrackerException, UpdateFailed, ConfigEntryNotReady) as err:
+            # Log the error but don't fail the setup - the entity will be unavailable
+            # until the coordinator successfully updates.
+            # ConfigEntryNotReady should not normally occur here because validation is
+            # already done in __init__.py, but we still catch it defensively.
+            LOGGER.warning(
+                "Failed to fetch initial data for tracker %s: %s",
+                coordinator.tracker_id,
+                err,
+            )
 
     entities = [
         GpsTrackerEntity(coordinator, config_entry, client, tracker)
@@ -88,7 +124,7 @@ async def async_setup_entry(
     ]
 
     hass.data[DOMAIN][config_entry.entry_id][CONF_ENTITIES].extend(entities)
-    async_add_entities(entities, update_before_add=True)
+    async_add_entities(entities, update_before_add=False)
 
 
 class GpsTrackerEntity(CoordinatorEntity[GpsTrackerCoordinator], TrackerEntity):

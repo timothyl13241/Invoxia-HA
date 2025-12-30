@@ -1,6 +1,7 @@
 """Config flow for Invoxia (unofficial) integration."""
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import aiohttp
@@ -23,13 +24,20 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
+def _import_gps_tracker():
+    """Import gps_tracker module (blocking operation run in thread)."""
+    import gps_tracker  # type: ignore
+    return gps_tracker
+
+
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
     """Validate the user input allows us to connect.
 
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
     # Import gps_tracker here to avoid import-time failures when package metadata is incomplete
-    import gps_tracker  # type: ignore  # pylint: disable=import-outside-toplevel
+    # Use to_thread to avoid blocking the event loop
+    gps_tracker = await asyncio.to_thread(_import_gps_tracker)
 
     cfg = gps_tracker.Config(  # type: ignore[call-arg]
         password=data[CONF_PASSWORD],

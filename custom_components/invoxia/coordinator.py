@@ -40,6 +40,11 @@ class GpsTrackerCoordinator(DataUpdateCoordinator):
             update_interval=DATA_UPDATE_INTERVAL,
         )
 
+    @property
+    def tracker_id(self) -> int:
+        """Return the tracker ID."""
+        return self._tracker.id
+
     async def _async_update_data(self) -> GpsTrackerData:
         """Fetch data from API."""
         LOGGER.debug("Fetching data for Tracker %u", self._tracker.id)
