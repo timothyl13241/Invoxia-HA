@@ -56,28 +56,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     if not trackers:
         LOGGER.warning("No trackers found for account %s", entry.data[CONF_USERNAME])
-        # Still proceed with setup even if no trackers are found
-        # User might add trackers later
-    else:
-        # Test that we can fetch data for all trackers before forwarding
-        # This validates the API is working properly and provides visibility
-        # into which trackers are accessible
-        found_working_tracker = False
-        for test_tracker in trackers:
-            try:
-                await client.get_locations(test_tracker, max_count=1)
-                LOGGER.debug("Successfully validated API access with tracker %s", test_tracker.id)
-                found_working_tracker = True
-                # Continue validating remaining trackers to log all failures
-            except gps_tracker.client.exceptions.GpsTrackerException as err:
-                LOGGER.warning("Failed to validate tracker %s: %s", test_tracker.id, err)
+        # Store empty list and skip platform forwarding since there are no entities to create
+        # User can reload the integration after adding trackers to their account
+        hass.data[DOMAIN][entry.entry_id][CLIENT] = client
+        hass.data[DOMAIN][entry.entry_id][CONF_ENTITIES] = []
+        hass.data[DOMAIN][entry.entry_id][TRACKERS] = []
+        return True
+    
+    # Test that we can fetch data for all trackers before forwarding
+    # This validates the API is working properly and provides visibility
+    # into which trackers are accessible
+    found_working_tracker = False
+    for test_tracker in trackers:
+        try:
+            await client.get_locations(test_tracker, max_count=1)
+            LOGGER.debug("Successfully validated API access with tracker %s", test_tracker.id)
+            found_working_tracker = True
+            # Continue validating remaining trackers to log all failures
+        except gps_tracker.client.exceptions.GpsTrackerException as err:
+            LOGGER.warning("Failed to validate tracker %s: %s", test_tracker.id, err)
 
-        if not found_working_tracker:
-            # None of the trackers validated successfully during setup
-            # Treat this as a transient setup failure so Home Assistant retries the entry
-            raise ConfigEntryNotReady(
-                f"Could not validate any tracker during setup for account {entry.data[CONF_USERNAME]}"
-            )
+    if not found_working_tracker:
+        # None of the trackers validated successfully during setup
+        # Setup continues anyway - coordinators will retry automatically for all trackers
+        LOGGER.warning("Could not validate any tracker during setup, entities will be unavailable until coordinators succeed")
 
     # Store all trackers in hass.data (including those that failed validation)
     # This is intentional - coordinators will automatically retry for failed trackers
