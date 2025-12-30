@@ -72,11 +72,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             except gps_tracker.client.exceptions.GpsTrackerException as err:
                 LOGGER.warning("Failed to validate tracker %s: %s", test_tracker.id, err)
                 continue
-        
+
         if not found_working_tracker:
             # None of the trackers validated successfully during setup
-            # Setup continues anyway - coordinators will retry automatically for all trackers
-            LOGGER.warning("Could not validate any tracker during setup, entities will be unavailable until coordinators succeed")
+            # Treat this as a transient setup failure so Home Assistant retries the entry
+            raise ConfigEntryNotReady(
+                f"Could not validate any tracker during setup for account {entry.data[CONF_USERNAME]}"
+            )
 
     # Store all trackers in hass.data (including those that failed validation)
     # This is intentional - coordinators will automatically retry for failed trackers
