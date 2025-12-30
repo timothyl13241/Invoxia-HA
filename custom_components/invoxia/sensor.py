@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.location import async_detect_location_info
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 
 from .const import ATTRIBUTION, CLIENT, COORDINATORS, DOMAIN, LOGGER, TRACKERS
@@ -78,11 +79,12 @@ async def async_setup_entry(
 
     entities = []
     for tracker, coordinator in zip(trackers, coordinators):
-        # Create battery, latitude, and longitude sensors for each tracker
+        # Create battery, latitude, longitude, and geocoded location sensors for each tracker
         entities.extend([
             GpsTrackerBatterySensor(coordinator, config_entry, tracker),
             GpsTrackerLatitudeSensor(coordinator, config_entry, tracker),
             GpsTrackerLongitudeSensor(coordinator, config_entry, tracker),
+            GpsTrackerGeocodedLocationSensor(coordinator, config_entry, tracker, hass),
         ])
 
     hass.data[DOMAIN][config_entry.entry_id][CONF_ENTITIES].extend(entities)
@@ -192,3 +194,76 @@ class GpsTrackerLongitudeSensor(GpsTrackerSensorBase):
         if self.coordinator.data:
             return self.coordinator.data.longitude
         return None
+
+
+class GpsTrackerGeocodedLocationSensor(GpsTrackerSensorBase):
+    """Geocoded location sensor for Invoxia GPS tracker."""
+
+    _attr_icon = "mdi:map-marker"
+
+    def __init__(
+        self,
+        coordinator: GpsTrackerCoordinator,
+        config_entry: ConfigEntry,
+        tracker: Tracker,
+        hass: HomeAssistant,
+    ) -> None:
+        """Initialize the geocoded location sensor."""
+        super().__init__(coordinator, config_entry, tracker)
+        self._attr_unique_id = f"{tracker.id}_location"
+        self._attr_name = "Location"
+        self._hass = hass
+        self._location_name: str | None = None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        if self.coordinator.data:
+            # Schedule the async geocoding
+            self._hass.async_create_task(self._async_update_location())
+        super()._handle_coordinator_update()
+
+    async def _async_update_location(self) -> None:
+        """Update the geocoded location."""
+        if not self.coordinator.data:
+            return
+
+        latitude = self.coordinator.data.latitude
+        longitude = self.coordinator.data.longitude
+
+        if latitude is None or longitude is None:
+            self._location_name = None
+            return
+
+        try:
+            location_info = await async_detect_location_info(
+                self._hass,
+                latitude,
+                longitude,
+            )
+            if location_info:
+                # Build a human-readable location string
+                parts = []
+                if location_info.city:
+                    parts.append(location_info.city)
+                if location_info.region:
+                    parts.append(location_info.region)
+                if location_info.country:
+                    parts.append(location_info.country)
+                self._location_name = ", ".join(parts) if parts else None
+            else:
+                self._location_name = None
+        except Exception as err:
+            LOGGER.debug(
+                "Could not geocode location for tracker %s: %s",
+                self._tracker.id,
+                err,
+            )
+            self._location_name = None
+
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the geocoded location."""
+        return self._location_name
