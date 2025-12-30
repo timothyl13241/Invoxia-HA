@@ -106,7 +106,7 @@ class GpsTrackerSensorBase(CoordinatorEntity[GpsTrackerCoordinator], SensorEntit
         super().__init__(coordinator)
         self._tracker = tracker
         self.config_entry = config_entry
-        
+
         # Set device info to link sensor to the tracker device
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, tracker.serial)},
