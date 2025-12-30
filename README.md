@@ -1,13 +1,13 @@
-# Invoxia GPS Tracker Integration for Home Assistant
+# Invoxia™ GPS Tracker Integration for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 
-This custom component integrates Invoxia GPS trackers with Home Assistant, allowing you to track the location of your Invoxia devices directly in your Home Assistant dashboard.
+This custom component integrates Invoxia™ GPS trackers with Home Assistant, allowing you to track the location of your Invoxia devices directly in your Home Assistant dashboard.
 
 ## Features
 
 - **Real-time Location Tracking**: Monitor the GPS location of all your Invoxia trackers
-- **Device Tracker Entities**: Each Invoxia device appears as a device tracker in Home Assistant
+- **Device Tracker Entities**: Each Invoxia™ device appears as a device tracker in Home Assistant
 - **Battery Monitoring**: Track battery levels for all devices
 - **Location Accuracy**: View the precision/accuracy of GPS coordinates
 - **Automatic Updates**: Integration polls for updates every 7 minutes (420 seconds)
@@ -17,9 +17,9 @@ This custom component integrates Invoxia GPS trackers with Home Assistant, allow
 ## Supported Devices
 
 This integration works with Invoxia GPS tracker devices, including:
-- Invoxia GPS Tracker (pets, vehicles, personal items)
-- Invoxia Bike Tracker
-- Any device compatible with the Invoxia GPS tracking platform
+- Invoxia™ GPS Tracker (pets, vehicles, personal items)
+- Invoxia™ Bike Tracker
+- Any device compatible with the Invoxia™ GPS tracking platform
 
 ## Installation
 
@@ -48,9 +48,9 @@ This integration works with Invoxia GPS tracker devices, including:
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
 3. Search for "Invoxia"
-4. Enter your Invoxia account credentials:
-   - **Username**: Your Invoxia account email
-   - **Password**: Your Invoxia account password
+4. Enter your Invoxia™ account credentials:
+   - **Username**: Your Invoxia™ account email
+   - **Password**: Your Invoxia™ account password
 5. Click **Submit**
 
 The integration will automatically discover all trackers associated with your account and create device tracker entities for each one.
@@ -165,29 +165,38 @@ If you change your Invoxia password or if your authentication expires:
 3. Click **Configure** or the re-authentication notification
 4. Enter your new credentials
 
-## API Rate Limiting
+## API Rate Limiting & Disclaimer
 
 The integration is designed to respect Invoxia's API rate limits:
 - Update interval: 420 seconds (7 minutes)
 - Efficient data fetching using batch operations
 - Automatic retry with exponential backoff on failures
 
+This integration uses the [gps-tracker](https://gps-tracker.readthedocs.io/) Python library to communicate with Invoxia's API.
+[gps_tracker on GitLab](https://gitlab.com/ezlo.picori/gps_tracker)
+
+As documented on the library:
+> Note that even though direct access to Invoxia™ API is not strictly prohibited in their terms of use, it is
+not encouraged either: company representatives have already stated that they do not currently consider making the
+API opened for all customers and this feature is limited to their pro tracking offer.
+Therefore, by using gps_tracker you:
+> 1. Accept to use this direct API access in a reasonable manner by limiting the query rate to the bare minimum required
+for your application.
+> 2. Understand that the Invoxia™ company may take any action they see fit regarding your account if they consider your
+usage of their API to be in violation with their terms of use.
+
 ## Privacy & Security
 
 - Your Invoxia credentials are stored securely in Home Assistant's encrypted configuration
-- Communication with Invoxia servers uses secure HTTPS connections
+- Communication with Invoxia™ servers uses secure HTTPS connections
 - No data is shared with third parties
 - All data processing happens locally within your Home Assistant instance
 
 ## Known Limitations
 
 - Location updates depend on the Invoxia device's GPS signal and reporting frequency
-- Battery life of devices is managed by Invoxia's platform (typically configured for optimal battery conservation)
-- The integration requires an active internet connection to communicate with Invoxia's cloud services
-
-## Development & Contributing
-
-This integration uses the [gps-tracker](https://gps-tracker.readthedocs.io/) Python library to communicate with Invoxia's API.
+- Battery life of devices is managed by Invoxia's™ platform (typically configured for optimal battery conservation)
+- The integration requires an active internet connection to communicate with Invoxia's™ cloud services
 
 ### Reporting Issues
 
