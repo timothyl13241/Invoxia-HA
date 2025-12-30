@@ -1,6 +1,8 @@
 """Platform for invoxia.sensor integration."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from gps_tracker import AsyncClient, Tracker
 from gps_tracker.client.exceptions import GpsTrackerException
 
@@ -15,8 +17,16 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.location import async_detect_location_info
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
+
+if TYPE_CHECKING:
+    from asyncio import Task
+
+try:
+    from homeassistant.helpers.location import async_detect_location_info
+    HAS_LOCATION_HELPER = True
+except ImportError:
+    HAS_LOCATION_HELPER = False
 
 from .const import ATTRIBUTION, CLIENT, COORDINATORS, DOMAIN, LOGGER, TRACKERS
 from .coordinator import GpsTrackerCoordinator
@@ -79,13 +89,18 @@ async def async_setup_entry(
 
     entities = []
     for tracker, coordinator in zip(trackers, coordinators):
-        # Create battery, latitude, longitude, and geocoded location sensors for each tracker
+        # Create battery, latitude, and longitude sensors for each tracker
         entities.extend([
             GpsTrackerBatterySensor(coordinator, config_entry, tracker),
             GpsTrackerLatitudeSensor(coordinator, config_entry, tracker),
             GpsTrackerLongitudeSensor(coordinator, config_entry, tracker),
-            GpsTrackerGeocodedLocationSensor(coordinator, config_entry, tracker, hass),
         ])
+        
+        # Add geocoded location sensor only if the location helper is available
+        if HAS_LOCATION_HELPER:
+            entities.append(
+                GpsTrackerGeocodedLocationSensor(coordinator, config_entry, tracker, hass)
+            )
 
     hass.data[DOMAIN][config_entry.entry_id][CONF_ENTITIES].extend(entities)
     async_add_entities(entities, update_before_add=False)
@@ -216,7 +231,7 @@ class GpsTrackerGeocodedLocationSensor(GpsTrackerSensorBase):
         self._location_name: str | None = None
         self._last_latitude: float | None = None
         self._last_longitude: float | None = None
-        self._geocoding_task = None
+        self._geocoding_task: Task[None] | None = None
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -239,6 +254,10 @@ class GpsTrackerGeocodedLocationSensor(GpsTrackerSensorBase):
 
     async def _async_update_location(self, latitude: float | None, longitude: float | None) -> None:
         """Update the geocoded location."""
+        if not HAS_LOCATION_HELPER:
+            LOGGER.debug("Location helper not available, skipping geocoding")
+            return
+            
         if latitude is None or longitude is None:
             if self._location_name is not None:
                 self._location_name = None
