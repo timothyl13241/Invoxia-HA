@@ -84,7 +84,7 @@ async def async_setup_entry(
             try:
                 await coordinator.async_config_entry_first_refresh()
             except (GpsTrackerException, UpdateFailed, ConfigEntryNotReady) as err:
-                LOGGER.warning(
+                LOGGER.debug(
                     "Failed to fetch initial data for tracker %s: %s",
                     coordinator.tracker_id,
                     err,

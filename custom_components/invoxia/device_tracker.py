@@ -115,7 +115,7 @@ async def async_setup_entry(
             # until the coordinator successfully updates.
             # ConfigEntryNotReady should not normally occur here because validation is
             # already done in __init__.py, but we still catch it defensively.
-            LOGGER.warning(
+            LOGGER.debug(
                 "Failed to fetch initial data for tracker %s: %s",
                 coordinator.tracker_id,
                 err,
