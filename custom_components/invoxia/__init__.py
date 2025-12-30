@@ -13,7 +13,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from .const import CLIENT, DOMAIN, LOGGER, TRACKERS
 from .helpers import get_invoxia_client
 
-PLATFORMS: list[Platform] = [Platform.DEVICE_TRACKER]
+PLATFORMS: list[Platform] = [Platform.DEVICE_TRACKER, Platform.SENSOR]
 
 
 def _import_gps_tracker():
@@ -74,7 +74,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             found_working_tracker = True
             # Continue validating remaining trackers to log all failures
         except gps_tracker.client.exceptions.GpsTrackerException as err:
-            LOGGER.warning("Failed to validate tracker %s: %s", test_tracker.id, err)
+            LOGGER.debug("Failed to validate tracker %s: %s", test_tracker.id, err)
 
     if not found_working_tracker:
         # None of the trackers validated successfully during setup

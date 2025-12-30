@@ -17,7 +17,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 
-from .const import ATTRIBUTION, CLIENT, DOMAIN, LOGGER, TRACKERS
+from .const import ATTRIBUTION, CLIENT, COORDINATORS, DOMAIN, LOGGER, TRACKERS
 from .coordinator import GpsTrackerCoordinator
 from .helpers import GpsTrackerData
 
@@ -98,6 +98,9 @@ async def async_setup_entry(
         GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
     ]
 
+    # Store coordinators in hass.data for reuse by sensor platform
+    hass.data[DOMAIN][config_entry.entry_id][COORDINATORS] = coordinators
+
     # Perform first refresh for each coordinator.
     # If a coordinator fails, we still add the entity but it will be unavailable
     # until the next successful update.
@@ -112,7 +115,7 @@ async def async_setup_entry(
             # until the coordinator successfully updates.
             # ConfigEntryNotReady should not normally occur here because validation is
             # already done in __init__.py, but we still catch it defensively.
-            LOGGER.warning(
+            LOGGER.debug(
                 "Failed to fetch initial data for tracker %s: %s",
                 coordinator.tracker_id,
                 err,
