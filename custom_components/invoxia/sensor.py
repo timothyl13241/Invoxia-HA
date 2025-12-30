@@ -214,25 +214,37 @@ class GpsTrackerGeocodedLocationSensor(GpsTrackerSensorBase):
         self._attr_name = "Location"
         self._hass = hass
         self._location_name: str | None = None
+        self._last_latitude: float | None = None
+        self._last_longitude: float | None = None
+        self._geocoding_task = None
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         if self.coordinator.data:
-            # Schedule the async geocoding
-            self._hass.async_create_task(self._async_update_location())
+            latitude = self.coordinator.data.latitude
+            longitude = self.coordinator.data.longitude
+            
+            # Only geocode if coordinates have changed
+            if (latitude != self._last_latitude or longitude != self._last_longitude):
+                # Cancel any pending geocoding task
+                if self._geocoding_task and not self._geocoding_task.done():
+                    self._geocoding_task.cancel()
+                
+                # Schedule the async geocoding
+                self._geocoding_task = self._hass.async_create_task(
+                    self._async_update_location(latitude, longitude)
+                )
         super()._handle_coordinator_update()
 
-    async def _async_update_location(self) -> None:
+    async def _async_update_location(self, latitude: float | None, longitude: float | None) -> None:
         """Update the geocoded location."""
-        if not self.coordinator.data:
-            return
-
-        latitude = self.coordinator.data.latitude
-        longitude = self.coordinator.data.longitude
-
         if latitude is None or longitude is None:
-            self._location_name = None
+            if self._location_name is not None:
+                self._location_name = None
+                self._last_latitude = None
+                self._last_longitude = None
+                self.async_write_ha_state()
             return
 
         try:
@@ -250,18 +262,27 @@ class GpsTrackerGeocodedLocationSensor(GpsTrackerSensorBase):
                     parts.append(location_info.region)
                 if location_info.country:
                     parts.append(location_info.country)
-                self._location_name = ", ".join(parts) if parts else None
+                new_location_name = ", ".join(parts) if parts else None
             else:
-                self._location_name = None
+                new_location_name = None
         except Exception as err:
             LOGGER.debug(
                 "Could not geocode location for tracker %s: %s",
                 self._tracker.id,
                 err,
             )
-            self._location_name = None
+            new_location_name = None
 
-        self.async_write_ha_state()
+        # Only update state if location name changed
+        if new_location_name != self._location_name:
+            self._location_name = new_location_name
+            self._last_latitude = latitude
+            self._last_longitude = longitude
+            self.async_write_ha_state()
+        else:
+            # Still update the cached coordinates even if name didn't change
+            self._last_latitude = latitude
+            self._last_longitude = longitude
 
     @property
     def native_value(self) -> str | None:
