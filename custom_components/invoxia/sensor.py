@@ -17,16 +17,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 
 if TYPE_CHECKING:
-    from asyncio import Task
-
     from gps_tracker import AsyncClient, Tracker
     from gps_tracker.client.exceptions import GpsTrackerException
-
-try:
-    from homeassistant.helpers.location import async_detect_location_info
-    HAS_LOCATION_HELPER = True
-except ImportError:
-    HAS_LOCATION_HELPER = False
 
 from .const import ATTRIBUTION, CLIENT, COORDINATORS, DOMAIN, LOGGER, TRACKERS
 from .coordinator import GpsTrackerCoordinator
@@ -98,12 +90,6 @@ async def async_setup_entry(
             GpsTrackerLatitudeSensor(coordinator, config_entry, tracker),
             GpsTrackerLongitudeSensor(coordinator, config_entry, tracker),
         ])
-        
-        # Add geocoded location sensor only if the location helper is available
-        if HAS_LOCATION_HELPER:
-            entities.append(
-                GpsTrackerGeocodedLocationSensor(coordinator, config_entry, tracker, hass)
-            )
 
     hass.data[DOMAIN][config_entry.entry_id][CONF_ENTITIES].extend(entities)
     async_add_entities(entities, update_before_add=False)
@@ -212,101 +198,3 @@ class GpsTrackerLongitudeSensor(GpsTrackerSensorBase):
         if self.coordinator.data:
             return self.coordinator.data.longitude
         return None
-
-
-class GpsTrackerGeocodedLocationSensor(GpsTrackerSensorBase):
-    """Geocoded location sensor for Invoxia GPS tracker."""
-
-    _attr_icon = "mdi:map-marker"
-
-    def __init__(
-        self,
-        coordinator: GpsTrackerCoordinator,
-        config_entry: ConfigEntry,
-        tracker: Tracker,
-        hass: HomeAssistant,
-    ) -> None:
-        """Initialize the geocoded location sensor."""
-        super().__init__(coordinator, config_entry, tracker)
-        self._attr_unique_id = f"{tracker.id}_location"
-        self._attr_name = "Location"
-        self._hass = hass
-        self._location_name: str | None = None
-        self._last_latitude: float | None = None
-        self._last_longitude: float | None = None
-        self._geocoding_task: Task[None] | None = None
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        if self.coordinator.data:
-            latitude = self.coordinator.data.latitude
-            longitude = self.coordinator.data.longitude
-            
-            # Only geocode if coordinates have changed
-            if (latitude != self._last_latitude or longitude != self._last_longitude):
-                # Cancel any pending geocoding task
-                if self._geocoding_task and not self._geocoding_task.done():
-                    self._geocoding_task.cancel()
-                
-                # Schedule the async geocoding
-                self._geocoding_task = self._hass.async_create_task(
-                    self._async_update_location(latitude, longitude)
-                )
-        super()._handle_coordinator_update()
-
-    async def _async_update_location(self, latitude: float | None, longitude: float | None) -> None:
-        """Update the geocoded location."""
-        if not HAS_LOCATION_HELPER:
-            LOGGER.debug("Location helper not available, skipping geocoding")
-            return
-            
-        if latitude is None or longitude is None:
-            if self._location_name is not None:
-                self._location_name = None
-                self._last_latitude = None
-                self._last_longitude = None
-                self.async_write_ha_state()
-            return
-
-        try:
-            location_info = await async_detect_location_info(
-                self._hass,
-                latitude,
-                longitude,
-            )
-            if location_info:
-                # Build a human-readable location string
-                parts = []
-                if location_info.city:
-                    parts.append(location_info.city)
-                if location_info.region:
-                    parts.append(location_info.region)
-                if location_info.country:
-                    parts.append(location_info.country)
-                new_location_name = ", ".join(parts) if parts else None
-            else:
-                new_location_name = None
-        except Exception as err:
-            LOGGER.debug(
-                "Could not geocode location for tracker %s: %s",
-                self._tracker.id,
-                err,
-            )
-            new_location_name = None
-
-        # Only update state if location name changed
-        if new_location_name != self._location_name:
-            self._location_name = new_location_name
-            self._last_latitude = latitude
-            self._last_longitude = longitude
-            self.async_write_ha_state()
-        else:
-            # Still update the cached coordinates even if name didn't change
-            self._last_latitude = latitude
-            self._last_longitude = longitude
-
-    @property
-    def native_value(self) -> str | None:
-        """Return the geocoded location."""
-        return self._location_name
