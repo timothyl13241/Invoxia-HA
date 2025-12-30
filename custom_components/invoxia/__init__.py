@@ -59,21 +59,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Still proceed with setup even if no trackers are found
         # User might add trackers later
     else:
-        # Test that we can fetch data for at least one tracker before forwarding
-        # This validates the API is working properly
-        # Try each tracker until we find one that works
+        # Test that we can fetch data for all trackers before forwarding
+        # This validates the API is working properly and provides visibility
+        # into which trackers are accessible
         found_working_tracker = False
         for test_tracker in trackers:
             try:
                 await client.get_locations(test_tracker, max_count=1)
                 LOGGER.debug("Successfully validated API access with tracker %s", test_tracker.id)
                 found_working_tracker = True
-                # Stop after validating one working tracker - this confirms API is working
-                # All trackers (including failed ones) will be added and their coordinators
-                # will retry automatically
-                break
+                # Continue validating remaining trackers to log all failures
             except gps_tracker.client.exceptions.GpsTrackerException as err:
-                LOGGER.warning("Failed to fetch data for tracker %s: %s", test_tracker.id, err)
+                LOGGER.warning("Failed to validate tracker %s: %s", test_tracker.id, err)
                 continue
         
         if not found_working_tracker:
