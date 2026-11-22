@@ -1,6 +1,7 @@
 """Platform for invoxia.sensor integration."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from homeassistant.components.sensor import (
@@ -11,16 +12,14 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITIES, PERCENTAGE
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 if TYPE_CHECKING:
-    from gps_tracker import AsyncClient, Tracker
-    from gps_tracker.client.exceptions import GpsTrackerException
+    from gps_tracker import Tracker
 
-from .const import ATTRIBUTION, CLIENT, COORDINATORS, DOMAIN, LOGGER, TRACKERS
+from .const import ATTRIBUTION, COORDINATORS, DOMAIN, LOGGER, TRACKERS
 from .coordinator import GpsTrackerCoordinator
 
 PARALLEL_UPDATES = 1
@@ -32,11 +31,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the sensor platform."""
-    # Import at runtime to avoid blocking the event loop during module import
-    from gps_tracker.client.exceptions import GpsTrackerException  # pylint: disable=import-outside-toplevel
-
-    client = hass.data[DOMAIN][config_entry.entry_id][CLIENT]
-    # Get trackers from hass.data (already fetched in __init__.py)
+    # Trackers and coordinators are created (and refreshed once) in __init__.py
     entry_data = hass.data[DOMAIN].get(config_entry.entry_id)
     if entry_data is None:
         LOGGER.error(
@@ -46,41 +41,11 @@ async def async_setup_entry(
         )
         return
 
-    if TRACKERS not in entry_data:
-        LOGGER.error(
-            "TRACKERS key missing in hass.data for config entry %s; "
-            "there may be a problem with invoxia integration initialization in __init__.py",
-            config_entry.entry_id,
-        )
-        return
-
     trackers = entry_data[TRACKERS]
+    coordinators = entry_data[COORDINATORS]
     if not trackers:
         LOGGER.info("No trackers found for this account")
         return
-
-    # Reuse coordinators created by device_tracker platform
-    coordinators = entry_data.get(COORDINATORS)
-    if coordinators is None:
-        LOGGER.error(
-            "COORDINATORS key missing in hass.data for config entry %s; "
-            "device_tracker platform should have created them first",
-            config_entry.entry_id,
-        )
-        # Fall back to creating coordinators if they don't exist
-        coordinators = [
-            GpsTrackerCoordinator(hass, config_entry, client, tracker) for tracker in trackers
-        ]
-        # Perform first refresh for each coordinator
-        for coordinator in coordinators:
-            try:
-                await coordinator.async_config_entry_first_refresh()
-            except (GpsTrackerException, UpdateFailed, ConfigEntryNotReady) as err:
-                LOGGER.debug(
-                    "Failed to fetch initial data for tracker %s: %s",
-                    coordinator.tracker_id,
-                    err,
-                )
 
     entities = []
     for tracker, coordinator in zip(trackers, coordinators):
@@ -89,6 +54,7 @@ async def async_setup_entry(
             GpsTrackerBatterySensor(coordinator, config_entry, tracker),
             GpsTrackerLatitudeSensor(coordinator, config_entry, tracker),
             GpsTrackerLongitudeSensor(coordinator, config_entry, tracker),
+            GpsTrackerLastLocationSensor(coordinator, config_entry, tracker),
         ])
 
     hass.data[DOMAIN][config_entry.entry_id][CONF_ENTITIES].extend(entities)
@@ -197,4 +163,28 @@ class GpsTrackerLongitudeSensor(GpsTrackerSensorBase):
         """Return the longitude."""
         if self.coordinator.data:
             return self.coordinator.data.longitude
+        return None
+
+
+class GpsTrackerLastLocationSensor(GpsTrackerSensorBase):
+    """Timestamp of the last position measured by the tracker."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self,
+        coordinator: GpsTrackerCoordinator,
+        config_entry: ConfigEntry,
+        tracker: Tracker,
+    ) -> None:
+        """Initialize the last location sensor."""
+        super().__init__(coordinator, config_entry, tracker)
+        self._attr_unique_id = f"{tracker.id}_last_location"
+        self._attr_name = "Last location"
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return when the tracker measured its last known position."""
+        if self.coordinator.data:
+            return self.coordinator.data.measured_at
         return None

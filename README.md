@@ -156,6 +156,12 @@ automation:
 - Restart the integration: **Settings** → **Devices & Services** → **Invoxia** → **⋮** → **Reload**
 - Check Home Assistant logs for API errors
 
+### Stale positions
+
+The tracker entity is only written when the tracker reports a **new** measurement, so its `last_updated` reflects the real freshness of the position (this matters for `person` entities, which pick the most recently updated source). The **Last location** sensor exposes when the tracker measured its last position.
+
+Optionally, set a **stale position threshold** (minutes) in **Settings** → **Devices & Services** → **Invoxia** → **Configure**. Past that delay without a new measurement, the tracker entity becomes `unavailable` (the latitude/longitude sensors keep the last known values). `0` (default) disables it.
+
 ### Re-authentication Required
 
 If you change your Invoxia password or if your authentication expires:

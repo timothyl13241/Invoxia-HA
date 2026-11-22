@@ -10,7 +10,7 @@ from homeassistant.const import CONF_ENTITIES, CONF_PASSWORD, CONF_USERNAME, Pla
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
-from .const import CLIENT, DOMAIN, LOGGER, TRACKERS
+from .const import CLIENT, COORDINATORS, DOMAIN, LOGGER, TRACKERS
 from .helpers import get_invoxia_client
 
 PLATFORMS: list[Platform] = [Platform.DEVICE_TRACKER, Platform.SENSOR]
@@ -20,6 +20,13 @@ def _import_gps_tracker():
     """Import gps_tracker module (blocking operation run in thread)."""
     import gps_tracker  # type: ignore
     return gps_tracker
+
+
+def _import_coordinator():
+    """Import the coordinator class (it imports gps_tracker, so run in thread)."""
+    from .coordinator import GpsTrackerCoordinator
+
+    return GpsTrackerCoordinator
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -61,35 +68,52 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN][entry.entry_id][CLIENT] = client
         hass.data[DOMAIN][entry.entry_id][CONF_ENTITIES] = []
         hass.data[DOMAIN][entry.entry_id][TRACKERS] = []
+        hass.data[DOMAIN][entry.entry_id][COORDINATORS] = []
         return True
     
-    # Test that we can fetch data for all trackers before forwarding
-    # This validates the API is working properly and provides visibility
-    # into which trackers are accessible
-    found_working_tracker = False
-    for test_tracker in trackers:
+    # Create the coordinators here, once, before the platforms are forwarded.
+    # The device_tracker and sensor platforms are set up concurrently and both
+    # need the same coordinators: creating them from one platform and reading
+    # them from the other depends on which platform happens to start first.
+    coordinator_class = await asyncio.to_thread(_import_coordinator)
+    coordinators = [
+        coordinator_class(hass, entry, client, tracker) for tracker in trackers
+    ]
+
+    # The first refresh also validates API access for every tracker. A tracker
+    # that fails here (for example one without an active subscription) does
+    # not prevent the setup: its entities stay unavailable until its
+    # coordinator succeeds. Home Assistant does not log a failed first
+    # refresh by itself, so log it here.
+    for coordinator in coordinators:
         try:
-            await client.get_locations(test_tracker, max_count=1)
-            LOGGER.debug("Successfully validated API access with tracker %s", test_tracker.id)
-            found_working_tracker = True
-            # Continue validating remaining trackers to log all failures
-        except gps_tracker.client.exceptions.GpsTrackerException as err:
-            LOGGER.debug("Failed to validate tracker %s: %s", test_tracker.id, err)
+            await coordinator.async_config_entry_first_refresh()
+        except ConfigEntryNotReady as err:
+            LOGGER.warning(
+                "Failed to fetch initial data for tracker %s: %s",
+                coordinator.tracker_label,
+                err,
+            )
 
-    if not found_working_tracker:
-        # None of the trackers validated successfully during setup
-        # Setup continues anyway - coordinators will retry automatically for all trackers
-        LOGGER.warning("Could not validate any tracker during setup, entities will be unavailable until coordinators succeed")
-
-    # Store all trackers in hass.data (including those that failed validation)
-    # This is intentional - coordinators will automatically retry for failed trackers
-    # Also prevents device_tracker.py from needing to call get_trackers() again
+    # Store all trackers in hass.data (including those that failed their
+    # first refresh): coordinators automatically retry.
     hass.data[DOMAIN][entry.entry_id][CLIENT] = client
     hass.data[DOMAIN][entry.entry_id][CONF_ENTITIES] = []
     hass.data[DOMAIN][entry.entry_id][TRACKERS] = trackers
+    hass.data[DOMAIN][entry.entry_id][COORDINATORS] = coordinators
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Re-evaluate entity availability when the options change (no reload)."""
+    entry_data = hass.data[DOMAIN].get(entry.entry_id)
+    if not entry_data:
+        return
+    for coordinator in entry_data[COORDINATORS]:
+        coordinator.async_update_listeners()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

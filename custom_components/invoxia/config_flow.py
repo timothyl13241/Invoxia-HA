@@ -7,13 +7,18 @@ from typing import Any
 import aiohttp
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry, ConfigFlow
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+)
 
-from .const import DOMAIN, LOGGER
+from .const import CONF_STALE_AFTER, DOMAIN, LOGGER
 from .helpers import get_invoxia_client
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
@@ -62,6 +67,12 @@ class InvoxiaFlowHandler(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     entry: ConfigEntry | None = None
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> InvoxiaOptionsFlow:
+        """Return the options flow handler."""
+        return InvoxiaOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -136,6 +147,35 @@ class InvoxiaFlowHandler(ConfigFlow, domain=DOMAIN):
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
         )
+
+
+class InvoxiaOptionsFlow(OptionsFlow):
+    """Handle the options of an Invoxia (unofficial) config entry."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(
+                data={CONF_STALE_AFTER: int(user_input[CONF_STALE_AFTER])}
+            )
+
+        current = self.config_entry.options.get(CONF_STALE_AFTER, 0)
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_STALE_AFTER, default=current): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0,
+                        max=43200,
+                        step=1,
+                        unit_of_measurement="min",
+                        mode=NumberSelectorMode.BOX,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
 
 
 class CannotConnect(HomeAssistantError):
