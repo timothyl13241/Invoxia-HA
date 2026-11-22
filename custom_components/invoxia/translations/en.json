@@ -16,5 +16,16 @@
                 }
             }
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Invoxia options",
+                "description": "Mark a tracker as unavailable when its last position is older than this delay. Set 0 to disable.",
+                "data": {
+                    "stale_after": "Stale position threshold (minutes)"
+                }
+            }
+        }
     }
 }

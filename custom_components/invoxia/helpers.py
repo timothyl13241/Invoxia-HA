@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant
@@ -20,6 +21,8 @@ class GpsTrackerData:
     longitude: float
     accuracy: int
     battery: int
+    # When the position was measured by the tracker (not when it was fetched)
+    measured_at: datetime | None = None
 
 
 def get_invoxia_client(hass: HomeAssistant, config: Config) -> AsyncClient:

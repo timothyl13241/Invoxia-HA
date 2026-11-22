@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
+from datetime import timedelta
 
 from gps_tracker import AsyncClient, Tracker
 from gps_tracker.client.datatypes import Tracker01, TrackerIcon
@@ -14,8 +15,17 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
-from .const import ATTRIBUTION, CLIENT, COORDINATORS, DOMAIN, LOGGER, TRACKERS
+from .const import (
+    ATTRIBUTION,
+    CLIENT,
+    CONF_STALE_AFTER,
+    COORDINATORS,
+    DOMAIN,
+    LOGGER,
+    TRACKERS,
+)
 from .coordinator import GpsTrackerCoordinator
 from .helpers import GpsTrackerData
 
@@ -131,6 +141,7 @@ class GpsTrackerEntity(CoordinatorEntity[GpsTrackerCoordinator], TrackerEntity):
             accuracy=0,
             battery=0,
         )
+        self._last_available: bool | None = None
         self._update_attr()
 
     def _update_attr(self) -> None:
@@ -141,10 +152,52 @@ class GpsTrackerEntity(CoordinatorEntity[GpsTrackerCoordinator], TrackerEntity):
         if self.coordinator.data is not None:
             self._tracker_data = self.coordinator.data
 
+    def _is_stale(self) -> bool:
+        """Return True if the last measurement is older than the stale threshold.
+
+        The threshold is configured in minutes in the options flow; 0 disables it.
+        """
+        minutes = self.config_entry.options.get(CONF_STALE_AFTER, 0)
+        measured_at = self._tracker_data.measured_at
+        if not minutes or measured_at is None:
+            return False
+        return dt_util.utcnow() - measured_at > timedelta(minutes=minutes)
+
+    @property
+    def available(self) -> bool:
+        """Return False when the API fails or the position is stale.
+
+        A stale position is reported as unavailable instead of being republished
+        as if it were fresh, so that consumers such as ``person`` ignore it.
+        """
+        return super().available and not self._is_stale()
+
+    async def async_added_to_hass(self) -> None:
+        """Remember the initial availability once the entity is registered."""
+        await super().async_added_to_hass()
+        self._last_available = self.available
+
     @callback
     def _handle_coordinator_update(self) -> None:
+        """Write the state only when a new measurement or availability change.
+
+        The coordinator refreshes every few minutes, but tracker entities force
+        an update on each state write, which would bump ``last_updated`` even
+        though the position did not change. ``person`` uses ``last_updated`` to
+        pick the freshest source, so unchanged data must not be rewritten.
+        """
+        previous = self._tracker_data
         self._update_attr()
-        return super()._handle_coordinator_update()
+        available = self.available
+        if (
+            self._tracker_data == previous
+            and available == self._last_available
+            and self.hass is not None
+            and self._last_available is not None
+        ):
+            return
+        self._last_available = available
+        super()._handle_coordinator_update()
 
     @property
     def extra_state_attributes(self) -> dict[str, int]:

@@ -78,4 +78,5 @@ class GpsTrackerCoordinator(DataUpdateCoordinator):
             longitude=locations[0].lng,
             accuracy=locations[0].precision,
             battery=status.battery,
+            measured_at=locations[0].datetime,
         )

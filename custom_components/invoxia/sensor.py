@@ -1,6 +1,7 @@
 """Platform for invoxia.sensor integration."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from homeassistant.components.sensor import (
@@ -53,6 +54,7 @@ async def async_setup_entry(
             GpsTrackerBatterySensor(coordinator, config_entry, tracker),
             GpsTrackerLatitudeSensor(coordinator, config_entry, tracker),
             GpsTrackerLongitudeSensor(coordinator, config_entry, tracker),
+            GpsTrackerLastLocationSensor(coordinator, config_entry, tracker),
         ])
 
     hass.data[DOMAIN][config_entry.entry_id][CONF_ENTITIES].extend(entities)
@@ -161,4 +163,28 @@ class GpsTrackerLongitudeSensor(GpsTrackerSensorBase):
         """Return the longitude."""
         if self.coordinator.data:
             return self.coordinator.data.longitude
+        return None
+
+
+class GpsTrackerLastLocationSensor(GpsTrackerSensorBase):
+    """Timestamp of the last position measured by the tracker."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self,
+        coordinator: GpsTrackerCoordinator,
+        config_entry: ConfigEntry,
+        tracker: Tracker,
+    ) -> None:
+        """Initialize the last location sensor."""
+        super().__init__(coordinator, config_entry, tracker)
+        self._attr_unique_id = f"{tracker.id}_last_location"
+        self._attr_name = "Last location"
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return when the tracker measured its last known position."""
+        if self.coordinator.data:
+            return self.coordinator.data.measured_at
         return None

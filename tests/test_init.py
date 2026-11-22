@@ -67,7 +67,7 @@ async def test_platforms_share_one_coordinator_per_tracker(
     coordinators = entry_data[COORDINATORS]
     assert len(coordinators) == 1
     entities = entry_data[CONF_ENTITIES]
-    assert len(entities) == 4  # device tracker, battery, latitude, longitude
+    assert len(entities) == 5  # tracker, battery, latitude, longitude, last location
     assert all(entity.coordinator is coordinators[0] for entity in entities)
     assert mock_client.get_locations.await_count == 1
     assert mock_client.get_tracker_status.await_count == 1

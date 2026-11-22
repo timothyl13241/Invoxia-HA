@@ -103,7 +103,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id][COORDINATORS] = coordinators
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Re-evaluate entity availability when the options change (no reload)."""
+    entry_data = hass.data[DOMAIN].get(entry.entry_id)
+    if not entry_data:
+        return
+    for coordinator in entry_data[COORDINATORS]:
+        coordinator.async_update_listeners()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
